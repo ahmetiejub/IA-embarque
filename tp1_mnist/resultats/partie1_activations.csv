@@ -1,0 +1,8 @@
+config,optimiseur,accuracy_test,epoch_convergence,epochs_executees,parametres,memoire_float32_Ko,memoire_int8_Ko,temps_entrainement_s,couches_cachees,activation
+a) softmax seul (784-10),Adam,0.9279,22,25,7850,30.7,7.7,33.6,[],-
+b) ReLU 256-128,Adam,0.9732,3,6,235146,918.5,229.6,10.9,"[256, 128]",relu
+b) ReLU 256-128-64,Adam,0.9724,3,6,242762,948.3,237.1,13.7,"[256, 128, 64]",relu
+c) tanh 128,Adam,0.9768,14,17,101770,397.5,99.4,24.2,[128],tanh
+c) tanh 256-128,Adam,0.974,7,10,235146,918.5,229.6,15.5,"[256, 128]",tanh
+d) sigmoid 128,Adam,0.9786,26,29,101770,397.5,99.4,38.9,[128],sigmoid
+d) sigmoid 256-128,Adam,0.9757,12,15,235146,918.5,229.6,21.1,"[256, 128]",sigmoid
