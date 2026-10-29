@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+Debug/
+Release/
+*.o
+*.d
+*.elf
+*.bin
+*.map
+*.list
+*.su
+*.cyclo
