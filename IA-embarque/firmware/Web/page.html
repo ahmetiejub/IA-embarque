@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Station météo IA – AMR &amp; EJUB</title>
+<style>
+:root{--bg:#eef2f7;--card:#fff;--txt:#132033;--mut:#66758c;--line:#e2e8f0;--ok:#16a34a;--ko:#dc2626;--wait:#94a3b8;
+--Soleil:#f59e0b;--Nuageux:#64748b;--Pluie:#2563eb;--Neige:#0891b2;--Brouillard:#94a3b8;--Clair:#f59e0b}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1018;--card:#141b26;--txt:#e7edf5;--mut:#8d9bb0;--line:#253043;--Nuageux:#94a3b8}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1120px;margin:auto;padding:0 16px}
+header{padding:22px 0 10px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+h1{font-size:21px;margin:0;letter-spacing:-.01em}h1 small{display:block;font-size:13px;font-weight:500;color:var(--mut);margin-top:2px}
+.pill{font-size:13px;padding:4px 11px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.pill b{color:var(--ok)}.pill.off b{color:var(--ko)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(12,1fr);padding-bottom:28px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;grid-column:span 12;min-width:0}
+@media(min-width:800px){.s4{grid-column:span 4}.s5{grid-column:span 5}.s7{grid-column:span 7}.s8{grid-column:span 8}}
+h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:0 0 12px;font-weight:650}
+.mut{color:var(--mut);font-size:13px}
+/* --- trois sources --- */
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:620px){.trio{grid-template-columns:1fr}}
+.src{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;position:relative;overflow:hidden}
+.src::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--k,var(--line))}
+.src svg{width:58px;height:58px;flex:none}
+.src .who{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.src .cl{font-size:25px;font-weight:750;line-height:1.15;color:var(--k,var(--txt))}
+.src .det{font-size:12.5px;color:var(--mut)}
+.verdict{margin-top:14px;padding:12px 14px;border-radius:12px;font-weight:650;display:flex;gap:10px;align-items:center;background:color-mix(in srgb,var(--wait) 14%,transparent)}
+.verdict.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.verdict.ko{background:color-mix(in srgb,var(--ko) 12%,transparent);color:var(--ko)}
+.verdict span{font-size:20px}
+/* --- score --- */
+.score{display:flex;gap:18px;align-items:center}
+.ring{width:120px;height:120px;flex:none}
+.big{font-size:34px;font-weight:750}
+.strip{display:flex;gap:4px;margin-top:14px;flex-wrap:wrap}
+.strip i{width:16px;height:16px;border-radius:4px;background:var(--line)}
+.strip i.ok{background:var(--ok)}.strip i.ko{background:var(--ko)}
+/* --- tableaux --- */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:12px;text-align:left;color:var(--mut);font-weight:600;padding:6px 6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-weight:650;font-size:12.5px;color:#fff;background:var(--k,#888)}
+.ok{color:var(--ok)}.ko{color:var(--ko)}
+/* --- probabilités / courbes --- */
+.bar{display:grid;grid-template-columns:84px 1fr 54px;gap:8px;align-items:center;margin:8px 0;font-size:14px}
+.bar i{display:block;height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.bar em{display:block;height:100%;border-radius:5px;transition:width .6s}
+.bar b{text-align:right;font-variant-numeric:tabular-nums}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:620px){.mini{grid-template-columns:1fr}}
+.mini>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.mini .v{font-size:22px;font-weight:700}.mini .v small{font-size:13px;color:var(--mut);font-weight:500;margin-left:2px}
+svg.sp{width:100%;height:42px;display:block;margin-top:4px}
+.empty{color:var(--mut);font-size:13px;padding:10px 0}
+footer{color:var(--mut);font-size:12px;padding:0 0 26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Station météo IA embarquée<small>Le Bourget-du-Lac · Projet AMR &amp; EJUB · ETRS923</small></h1>
+  <div class="pill" id="etat"><b>●</b> connexion à la carte…</div>
+</header>
+<div class="grid">
+
+  <section class="c s8">
+    <h2>Qui dit quoi ?</h2>
+    <div class="trio">
+      <div class="src" id="src_e"><div id="ico_e"></div><div><div class="who">Carte (IA Edge)</div><div class="cl" id="cl_e">–</div><div class="det" id="det_e">en attente</div></div></div>
+      <div class="src" id="src_c"><div id="ico_c"></div><div><div class="who">Cloud (MATLAB)</div><div class="cl" id="cl_c">–</div><div class="det">via ThingSpeak + TalkBack</div></div></div>
+      <div class="src" id="src_r"><div id="ico_r"></div><div><div class="who">Vraie météo</div><div class="cl" id="cl_r">–</div><div class="det" id="det_r">Open-Meteo</div></div></div>
+    </div>
+    <div class="verdict" id="verdict"><span>…</span><div>En attente de la première comparaison</div></div>
+  </section>
+
+  <section class="c s4">
+    <h2>Score de la carte</h2>
+    <div class="score">
+      <svg class="ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--line)" stroke-width="12"/>
+        <circle id="arc" cx="60" cy="60" r="50" fill="none" stroke="var(--ok)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 315" transform="rotate(-90 60 60)"/></svg>
+      <div><div class="big" id="pct">–</div><div class="mut" id="cnt">aucune vérification</div></div>
+    </div>
+    <div class="mut" style="margin-top:12px">20 dernières vérifications</div>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <section class="c s7">
+    <h2>Mesures de la carte et météo dehors</h2>
+    <table>
+      <tr><th></th><th class="n">Carte</th><th class="n">Dehors</th><th class="n">Écart</th></tr>
+      <tr><td>Température</td><td class="n" id="t_c">–</td><td class="n" id="t_r">–</td><td class="n" id="t_d">–</td></tr>
+      <tr><td>Humidité</td><td class="n" id="h_c">–</td><td class="n" id="h_r">–</td><td class="n" id="h_d">–</td></tr>
+      <tr><td>Pression (niveau mer)</td><td class="n" id="p_c">–</td><td class="n" id="p_r">–</td><td class="n" id="p_d">–</td></tr>
+    </table>
+    <div class="mut" id="note" style="margin-top:10px"></div>
+  </section>
+
+  <section class="c s5">
+    <h2>Probabilités calculées par la carte</h2>
+    <div id="probas"></div>
+    <div class="mut" id="tend" style="margin-top:8px"></div>
+  </section>
+
+  <section class="c s7">
+    <h2>Journal des vérifications</h2>
+    <table><thead><tr><th>Heure (UTC)</th><th>Carte</th><th>Vraie météo</th><th class="n">Résultat</th></tr></thead><tbody id="log"></tbody></table>
+    <div class="empty" id="log_vide">Première vérification environ 1 minute après la connexion à Internet.</div>
+  </section>
+
+  <section class="c s5">
+    <h2>Dernières minutes</h2>
+    <div class="mini">
+      <div><div class="mut">Température</div><div class="v" id="m_t">–<small>°C</small></div><svg class="sp" id="sp_t"></svg></div>
+      <div><div class="mut">Humidité</div><div class="v" id="m_h">–<small>%</small></div><svg class="sp" id="sp_h"></svg></div>
+      <div><div class="mut">Pression</div><div class="v" id="m_p">–<small>hPa</small></div><svg class="sp" id="sp_p"></svg></div>
+    </div>
+    <table style="margin-top:12px">
+      <tr><td>Inférence sur la carte</td><td class="n" id="us">–</td></tr>
+      <tr><td>Processeur</td><td class="n" id="cpu">–</td></tr>
+      <tr><td>Adresse IP · en marche depuis</td><td class="n" id="ip">–</td></tr>
+    </table>
+    <div class="mut" style="margin-top:8px" id="modele"></div>
+  </section>
+</div>
+<footer>Page servie directement par la carte STM32N6 · mise à jour toutes les 3 s · la vraie météo est vérifiée toutes les 60 s</footer>
+</div>
+<script>
+var ICO={
+Soleil:'<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="12" fill="#f59e0b"/><g stroke="#f59e0b" stroke-width="4" stroke-linecap="round"><path d="M32 7v7M32 50v7M7 32h7M50 32h7M14.3 14.3l5 5M44.7 44.7l5 5M14.3 49.7l5-5M44.7 19.3l5-5"/></g></svg>',
+Nuageux:'<svg viewBox="0 0 64 64"><path d="M19 47h27a11 11 0 0 0 0-22 15 15 0 0 0-28 4 9 9 0 0 0 1 18z" fill="#94a3b8"/></svg>',
+Pluie:'<svg viewBox="0 0 64 64"><path d="M19 37h27a11 11 0 0 0 0-22 15 15 0 0 0-28 4 9 9 0 0 0 1 18z" fill="#64748b"/><g stroke="#2563eb" stroke-width="4" stroke-linecap="round"><path d="M22 45l-3 9M33 45l-3 9M44 45l-3 9"/></g></svg>',
+Neige:'<svg viewBox="0 0 64 64"><path d="M19 37h27a11 11 0 0 0 0-22 15 15 0 0 0-28 4 9 9 0 0 0 1 18z" fill="#94a3b8"/><g fill="#0891b2"><circle cx="21" cy="49" r="3.5"/><circle cx="32" cy="54" r="3.5"/><circle cx="43" cy="49" r="3.5"/></g></svg>'};
+ICO.Clair=ICO.Soleil;ICO.Brouillard=ICO.Nuageux;
+function $(i){return document.getElementById(i)}
+function col(c){var v=getComputedStyle(document.documentElement).getPropertyValue('--'+c).trim();return v||'#888'}
+function f(v,d){return (v===null||v===undefined||isNaN(v))?'–':Number(v).toFixed(d)}
+function sg(v,d){return (v>0?'+':'')+f(v,d)}
+function tag(c){return c?'<span class="tag" style="--k:'+col(c)+'">'+c+'</span>':'–'}
+function src(id,c){var el=$('src_'+id);el.style.setProperty('--k',c?col(c):'var(--line)');$('cl_'+id).textContent=c||'–';$('ico_'+id).innerHTML=c?(ICO[c]||''):''}
+function spark(id,v,c){var s=$(id),w=s.clientWidth||160,h=42;if(!v||v.length<2){s.innerHTML='';return}
+ var mn=Math.min.apply(0,v),mx=Math.max.apply(0,v);if(mx-mn<0.4){mn-=0.2;mx+=0.2}
+ var pts=v.map(function(y,i){return (i*(w-4)/(v.length-1)+2).toFixed(1)+','+(h-4-(y-mn)/(mx-mn)*(h-8)).toFixed(1)}).join(' ');
+ s.setAttribute('viewBox','0 0 '+w+' '+h);s.innerHTML='<polyline fill="none" stroke="'+c+'" stroke-width="2.3" stroke-linejoin="round" points="'+pts+'"/>'}
+function duree(s){var h=Math.floor(s/3600),m=Math.floor(s%3600/60);return (h?h+' h ':'')+m+' min'}
+var dernier=0;
+function maj(){fetch('/data.json',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
+ dernier=Date.now();var e=d.edge,k=d.capteurs,r=d.reelle;
+ /* trois sources */
+ src('e',e.classe);src('c',d.cloud);src('r',r.classe);
+ $('det_e').textContent=e.classe?'confiance '+f(100*Math.max.apply(0,e.proba),0)+' % · '+f(e.us/1000,1)+' ms':'en attente';
+ $('det_r').textContent=r.classe?'Open-Meteo · code WMO '+r.code:'Open-Meteo';
+ var v=$('verdict');
+ if(e.classe&&r.classe){var ok=e.classe===r.classe;v.className='verdict '+(ok?'ok':'ko');
+  v.innerHTML='<span>'+(ok?'✓':'✗')+'</span><div>'+(ok?'La carte est d\'accord avec la vraie météo':'La carte se trompe : elle dit '+e.classe+', dehors c\'est '+r.classe)+
+  (d.cloud?(d.cloud===e.classe?' · le Cloud dit pareil':' · le Cloud dit '+d.cloud):'')+'</div>'}
+ /* score */
+ var s=d.score,p=s[1]?s[0]/s[1]:0;$('pct').textContent=s[1]?Math.round(100*p)+' %':'–';
+ $('cnt').textContent=s[1]?s[0]+' bonnes réponses sur '+s[1]:'aucune vérification';
+ $('arc').setAttribute('stroke-dasharray',(314.2*p).toFixed(1)+' 315');$('arc').setAttribute('stroke',p>=.5?col('ok'):col('ko'));
+ var vs=d.verifs||[];$('strip').innerHTML=vs.slice().reverse().map(function(x){return '<i class="'+(x.ok?'ok':'ko')+'" title="'+x.h+' : '+x.e+' / '+x.r+'"></i>'}).join('');
+ /* carte vs dehors */
+ var has=!!r.classe;
+ $('t_c').textContent=f(k.temp,1)+' °C';$('h_c').textContent=f(k.rhum,0)+' %';$('p_c').textContent=f(k.p_mer,1)+' hPa';
+ $('t_r').textContent=has?f(r.t,1)+' °C':'–';$('h_r').textContent=has?f(r.rh,0)+' %':'–';$('p_r').textContent=has?f(r.p,1)+' hPa':'–';
+ $('t_d').textContent=has?sg(k.temp-r.t,1):'–';$('h_d').textContent=has?sg(k.rhum-r.rh,0):'–';$('p_d').textContent=has?sg(k.p_mer-r.p,1):'–';
+ $('note').textContent=has&&Math.abs(k.temp-r.t)>5?'La carte mesure un air bien différent de l\'extérieur (elle est sans doute à l\'intérieur) : sa réponse ne peut pas refléter la météo dehors.':'';
+ /* probabilités */
+ $('probas').innerHTML=d.classes.map(function(c,i){var q=100*(e.proba[i]||0);
+  return '<div class="bar"><span>'+c+'</span><i><em style="width:'+q.toFixed(1)+'%;background:'+col(c)+'"></em></i><b>'+q.toFixed(1)+' %</b></div>'}).join('');
+ $('tend').textContent='Tendance de la pression sur 3 h : '+(e.hist_ok?sg(k.dpres3h,1)+' hPa':'historique en cours de remplissage')+(e.heure?' · '+e.heure+' UTC':'');
+ /* journal */
+ $('log').innerHTML=vs.map(function(x){return '<tr><td>'+x.h+'</td><td>'+tag(x.e)+' <span class="mut">'+f(100*x.pe,0)+' %</span></td><td>'+tag(x.r)+'</td><td class="n '+(x.ok?'ok':'ko')+'">'+(x.ok?'✓ correct':'✗ faux')+'</td></tr>'}).join('');
+ $('log_vide').style.display=vs.length?'none':'block';
+ /* courbes et carte */
+ $('m_t').firstChild.nodeValue=f(k.temp,1);$('m_h').firstChild.nodeValue=f(k.rhum,0);$('m_p').firstChild.nodeValue=f(k.p_mer,0);
+ spark('sp_t',d.hist.t,'#ef4444');spark('sp_h',d.hist.rh,'#0891b2');spark('sp_p',d.hist.p,'#8b5cf6');
+ $('us').textContent=f(e.us,0)+' µs';$('cpu').textContent='Cortex-M55 à '+d.cpu_mhz+' MHz';
+ $('ip').textContent=d.ip+' · '+duree(d.uptime);$('modele').textContent='Modèle : '+d.modele;
+}).catch(function(){})}
+setInterval(function(){var a=(Date.now()-dernier)/1000,el=$('etat');
+ if(!dernier||a>10){el.className='pill off';el.innerHTML='<b>●</b> carte injoignable'}
+ else{el.className='pill';el.innerHTML='<b>●</b> en direct · il y a '+Math.round(a)+' s'}},1000);
+maj();setInterval(maj,3000);
+</script>
+</body>
+</html>

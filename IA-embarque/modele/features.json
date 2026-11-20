@@ -1,0 +1,24 @@
+{
+ "features": [
+  "temp",
+  "rhum",
+  "pres",
+  "dpres3h",
+  "spread",
+  "lat",
+  "lon",
+  "alt",
+  "doy_sin",
+  "doy_cos",
+  "hour_sin",
+  "hour_cos"
+ ],
+ "classes": [
+  "Brouillard",
+  "Clair",
+  "Neige",
+  "Nuageux",
+  "Pluie"
+ ],
+ "notes": "heure en UTC ; pres = pression ramenee au niveau de la mer ; dpres3h = pres(t) - pres(t-3h)"
+}

@@ -1,0 +1,22 @@
+# --- Secrets : cles API ThingSpeak (ne jamais publier) ---
+**/thingspeak_keys.h
+
+# --- Compilation STM32CubeIDE ---
+**/Debug/
+**/Release/
+*.o
+*.d
+*.su
+*.elf
+*.map
+*.list
+*.bin
+*.hex
+
+# --- Fichiers locaux d'IDE / systeme ---
+.metadata/
+*.launch.bak
+.DS_Store
+Thumbs.db
+__pycache__/
+.ipynb_checkpoints/
