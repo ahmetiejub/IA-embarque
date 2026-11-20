@@ -4,6 +4,10 @@
 
 Une carte STM32N6 mesure la température, l'humidité et la pression, puis un réseau de neurones **exécuté directement sur la carte** (Edge AI) classe la météo en **Soleil, Nuageux, Pluie ou Neige**. Le même modèle tourne aussi **dans le Cloud** (ThingSpeak + MATLAB) : la carte compare les deux réponses, puis les confronte à **la vraie météo** (Open-Meteo). Tout est visible en direct sur une **page web servie par la carte**.
 
+### 🌐 Tableau de bord public : **https://ahmetiejub.github.io/IA-embarque/**
+
+Résultats en direct depuis n'importe où (la page lit ThingSpeak et Open-Meteo). Sur le réseau local, la carte sert aussi sa propre page sur `http://IP-de-la-carte/`.
+
 ![Interface web servie par la carte](docs/img/interface_web.png)
 
 ---
@@ -35,7 +39,9 @@ flowchart LR
     MATLAB -- "classe" --> TB["ThingSpeak<br/>TalkBack"]
     TB -- "classe Cloud" --> CARTE
     OM["Open-Meteo<br/>vraie météo"] -- "vérification / 60 s" --> CARTE
-    CARTE -- "http://IP-de-la-carte/" --> WEB["Page web<br/>en direct"]
+    CARTE -- "http://IP-de-la-carte/" --> WEB["Page web locale"]
+    TS --> PUB["Page publique<br/>GitHub Pages"]
+    OM --> PUB
 ```
 
 1. **Entraînement (Cloud, une fois)** — Colab télécharge plusieurs années de météo horaire (MeteoStat), entraîne un réseau dense avec TensorFlow et l'exporte en ONNX.
@@ -52,6 +58,8 @@ flowchart LR
 - **Vérification avec la vraie météo** (Open-Meteo, HTTP, sans clé) et score cumulé.
 - **Mode hors ligne** : la carte classe même sans réseau (heure de compilation en secours, recalée sur Internet dès que possible).
 - **Réseau robuste** : DHCP, DNS de secours, détection et rejet d'un serveur DHCP sans accès Internet, buffers DMA Ethernet à adresse fixe.
+- **Démarrage autonome** : le FSBL copie l'application depuis la flash externe (XSPI2) en RAM ; la carte repart seule après une coupure de courant (`firmware/Demarrage_autonome/`).
+- **Page publique** (GitHub Pages, `docs/index.html`) : mêmes résultats accessibles depuis Internet via ThingSpeak (champs 4 à 7 : classe Edge, confiance, vraie météo, score).
 - **Page web embarquée** (port 80) : classe et probabilités, comparaison carte / Cloud / réel, mesures carte vs dehors, journal des vérifications, courbes.
 
 ![Console de la carte](docs/img/console.png)
@@ -81,7 +89,11 @@ flowchart LR
 │   └── 2_modele_capteurs_4_classes.ipynb   Nouveau modèle : capteurs seuls, 4 classes, génère meteo_modele.h
 ├── matlab/tp3_classification_boucle.m      Classification Cloud (ThingSpeak → ONNX → TalkBack)
 ├── modele/                       meteo.onnx, labels.json, features.json, echantillons_test.csv
-└── docs/img/                     Captures
+├── firmware/Demarrage_autonome/  Script de signature + flash pour démarrer sans PC
+└── docs/
+    ├── index.html                Tableau de bord public (GitHub Pages)
+    ├── Schema_station_meteo_AMR_EJUB.pptx   Schéma du système pour la présentation
+    └── img/                      Captures
 ```
 
 ---

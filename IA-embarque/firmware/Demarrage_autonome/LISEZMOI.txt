@@ -1,0 +1,20 @@
+DEMARRAGE AUTONOME (sans PC) - Projet AMR & EJUB
+=================================================
+
+Principe : la STM32N6 n'a pas de flash interne. Au demarrage, la puce (boot ROM)
+charge le FSBL depuis la flash externe ; notre FSBL lit ensuite l'application
+dans la flash externe (0x70100000), la recopie en RAM (0x34000000) et la lance.
+
+1. CubeIDE : clic droit sur amr-ejub_FSBL > Build, puis amr-ejub_Appli > Build.
+   (Verifier d'abord que l'Appli marche toujours avec Run, comme d'habitude.)
+2. Carte en mode developpement (BOOT1 en 2-3), USB branche, session de debug fermee.
+3. Double-clic sur flasher_carte.bat (signe et ecrit FSBL + application).
+4. Debrancher, mettre BOOT0 en 1-2 et BOOT1 en 1-2, rebrancher : la carte demarre seule.
+
+Retour au mode CubeIDE : BOOT1 en 2-3.
+Diagnostic : LED rouge qui clignote vite = le FSBL n'a pas pu charger l'application.
+Console sans debug : terminal serie 115200 bauds sur le port COM du ST-Link.
+
+A refaire apres chaque modification du code : etapes 1 a 4.
+Si le .ioc est regenere par CubeMX : reactiver HAL_XSPI_MODULE_ENABLED dans
+FSBL/Core/Inc/stm32n6xx_hal_conf.h.

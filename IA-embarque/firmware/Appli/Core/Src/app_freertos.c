@@ -350,14 +350,37 @@ static const char *http_envoyer(void)
 }
 
 /* 2.c : envoie T, RH et pression STATION au canal des mesures (field1..3) */
+/* Valeurs definies plus bas (resultats Edge et verification), publiees aussi sur ThingSpeak */
+static int derniere_classe_edge;
+static float derniere_proba_edge;
+static int derniere_classe_reelle = -1;
+static unsigned nb_verif, nb_correct;
+
+/* Envoi a ThingSpeak (canal 3546450) :
+   field1..3 = T, RH, P station (mesures)        -> classification Cloud (MATLAB)
+   field4 = classe Edge (0 Neige, 1 Nuageux, 2 Pluie, 3 Soleil), field5 = confiance Edge (%)
+   field6 = vraie meteo (meme codage), field7 = score Edge / vraie meteo (%)  -> page publique */
 static void thingspeak_envoyer_mesures(float t, float rh, float p_station)
 {
+    char extra[96] = "";
+    int n = 0;
+    if (derniere_classe_edge >= 0) {
+        n += snprintf(extra + n, sizeof(extra) - (size_t)n, "&field4=%d&field5=%.1f",
+                      derniere_classe_edge, 100.0f * derniere_proba_edge);
+    }
+    if (derniere_classe_reelle >= 0) {
+        n += snprintf(extra + n, sizeof(extra) - (size_t)n, "&field6=%d", derniere_classe_reelle);
+    }
+    if (nb_verif > 0) {
+        snprintf(extra + n, sizeof(extra) - (size_t)n, "&field7=%.0f",
+                 100.0f * (float)nb_correct / (float)nb_verif);
+    }
     snprintf(http_req, sizeof(http_req),
-             "GET /update?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f HTTP/1.1\r\n"
+             "GET /update?api_key=%s&field1=%.2f&field2=%.2f&field3=%.2f%s HTTP/1.1\r\n"
              "Host: " TS_HOST "\r\n"
              "User-Agent: STM32N6-ETRS923\r\n"
              "Connection: close\r\n\r\n",
-             TS_WRITE_KEY, t, rh, p_station);
+             TS_WRITE_KEY, t, rh, p_station, extra);
     printf("  [ThingSpeak] Envoi des mesures au canal 3546450...\r\n");
     const char *corps = http_envoyer();
     if (corps == NULL) {
@@ -479,6 +502,7 @@ static void meteo_reelle_verifier(void)
     printf("<Meteo reelle> Open-Meteo : %s (code WMO %d) | dehors : T=%.1f C  RH=%.0f %%  P mer=%.1f hPa\r\n",
            reelle, (int)code, t, rh, pmer);
 
+    derniere_classe_reelle = classe_index(reelle);
     WEB_Reelle(reelle, (int)code, t, rh, pmer, nb_correct, nb_verif);
     if (derniere_classe_edge < 0 || classe_index(reelle) < 0) {
         return;                         /* pas encore d'inference sur la carte */

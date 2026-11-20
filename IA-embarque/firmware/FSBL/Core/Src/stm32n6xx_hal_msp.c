@@ -77,5 +77,39 @@ void HAL_MspInit(void)
 }
 
 /* USER CODE BEGIN 1 */
+/* Projet AMR & EJUB : broches et horloge de la flash externe (XSPI2, port 2 du XSPIM) */
+void HAL_XSPI_MspInit(XSPI_HandleTypeDef* hxspi)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+
+  if (hxspi->Instance == XSPI2)
+  {
+    /* Alimentation des broches de la flash (1,8 V sur la NUCLEO) */
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWREx_EnableVddIO3();
+    HAL_PWREx_ConfigVddIORange(PWR_VDDIO3, PWR_VDDIO_RANGE_1V8);
+
+    /* Horloge XSPI2 = HCLK (32 MHz avec HSI 64 MHz / 2) : vitesse sure, sans fusible OTP */
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_XSPI2;
+    PeriphClkInitStruct.Xspi2ClockSelection = RCC_XSPI2CLKSOURCE_HCLK;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
+    __HAL_RCC_XSPIM_CLK_ENABLE();
+    __HAL_RCC_XSPI2_CLK_ENABLE();
+    __HAL_RCC_GPION_CLK_ENABLE();
+
+    /* PN0 DQS0, PN1 NCS1, PN2..PN5 IO0..IO3, PN6 CLK, PN8..PN11 IO4..IO7 */
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5
+                        | GPIO_PIN_6 | GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_11;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF9_XSPIM_P2;
+    HAL_GPIO_Init(GPION, &GPIO_InitStruct);
+  }
+}
 
 /* USER CODE END 1 */

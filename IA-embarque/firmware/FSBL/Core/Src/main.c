@@ -21,6 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+/* Projet AMR & EJUB : demarrage autonome. Le FSBL lit la flash externe (XSPI2)
+   et recopie l'application en RAM, puis la lance (mode "Load and Run"). */
+#include "extmem.h"
 
 /* USER CODE END Includes */
 
@@ -42,6 +45,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+XSPI_HandleTypeDef hxspi2;                 /* flash externe MX25UM51245G (XSPI2) */
 
 /* USER CODE END PV */
 
@@ -53,6 +57,59 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/* Diagnostic par LED (sans console au demarrage autonome) :
+   - LED verte : 3 clignotements = le FSBL demarre
+   - LED bleue : 3 clignotements = la flash externe est prete
+   - LED rouge lente (1 fois / s)  = erreur de configuration (Error_Handler)
+   - LED rouge rapide (5 fois / s) = l'application n'a pas pu etre chargee */
+static void attente(volatile uint32_t n) { while (n--) { __NOP(); } }
+static void led_init(void)
+{
+  GPIO_InitTypeDef g = {0};
+  __HAL_RCC_GPIOG_CLK_ENABLE();
+  g.Pin = GPIO_PIN_0 | GPIO_PIN_8 | GPIO_PIN_10;
+  g.Mode = GPIO_MODE_OUTPUT_PP; g.Pull = GPIO_NOPULL; g.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOG, &g);
+  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0 | GPIO_PIN_8 | GPIO_PIN_10, GPIO_PIN_SET);
+}
+static void led_clignote(uint16_t pin, int fois)
+{
+  for (int i = 0; i < 2 * fois; i++) { HAL_GPIO_TogglePin(GPIOG, pin); attente(1500000); }
+}
+
+/* Configuration de XSPI2 (reprise du modele ST Template_FSBL_LRUN, NUCLEO-N657X0-Q) */
+static void MX_XSPI2_Init(void)
+{
+  XSPIM_CfgTypeDef sXspiManagerCfg = {0};
+
+  hxspi2.Instance = XSPI2;
+  hxspi2.Init.FifoThresholdByte = 4;
+  hxspi2.Init.MemoryMode = HAL_XSPI_SINGLE_MEM;
+  hxspi2.Init.MemoryType = HAL_XSPI_MEMTYPE_MACRONIX;
+  hxspi2.Init.MemorySize = HAL_XSPI_SIZE_512MB;
+  hxspi2.Init.ChipSelectHighTimeCycle = 2;
+  hxspi2.Init.FreeRunningClock = HAL_XSPI_FREERUNCLK_DISABLE;
+  hxspi2.Init.ClockMode = HAL_XSPI_CLOCK_MODE_0;
+  hxspi2.Init.WrapSize = HAL_XSPI_WRAP_NOT_SUPPORTED;
+  hxspi2.Init.ClockPrescaler = 0;
+  hxspi2.Init.SampleShifting = HAL_XSPI_SAMPLE_SHIFT_NONE;
+  hxspi2.Init.DelayHoldQuarterCycle = HAL_XSPI_DHQC_ENABLE;
+  hxspi2.Init.ChipSelectBoundary = HAL_XSPI_BONDARYOF_NONE;
+  hxspi2.Init.MaxTran = 0;
+  hxspi2.Init.Refresh = 0;
+  hxspi2.Init.MemorySelect = HAL_XSPI_CSSEL_NCS1;
+  if (HAL_XSPI_Init(&hxspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sXspiManagerCfg.nCSOverride = HAL_XSPI_CSSEL_OVR_NCS1;
+  sXspiManagerCfg.IOPort = HAL_XSPIM_IOPORT_2;
+  sXspiManagerCfg.Req2AckTime = 1;
+  if (HAL_XSPIM_Config(&hxspi2, &sXspiManagerCfg, HAL_XSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -71,6 +128,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  led_init();
+  led_clignote(GPIO_PIN_0, 3);               /* vert : le FSBL tourne */
 
   /* USER CODE END Init */
 
@@ -83,6 +142,25 @@ int main(void)
 
   /* Initialize all configured peripherals */
   /* USER CODE BEGIN 2 */
+  /* Horloges inchangees (HSI 64 MHz, comme en mode Dev_Boot) : l'application tourne
+     exactement comme quand elle est lancee depuis CubeIDE. Pas de cache, pas de fusible OTP. */
+  __HAL_RCC_GPION_CLK_ENABLE();
+  /* Au demarrage sur flash, la puce a deja utilise XSPI2 : on le remet a zero
+     pour partir du meme etat qu'en mode developpement */
+  __HAL_RCC_XSPI2_FORCE_RESET();  __HAL_RCC_XSPI2_RELEASE_RESET();
+  __HAL_RCC_XSPIM_FORCE_RESET();  __HAL_RCC_XSPIM_RELEASE_RESET();
+  MX_XSPI2_Init();
+  MX_EXTMEM_Init();
+  led_clignote(GPIO_PIN_8, 3);               /* bleu : flash externe prete */
+  BOOT_Application();       /* copie 0x70100000 -> 0x34000000, puis saute dans l'application */
+  /* On n'arrive ici qu'en cas d'echec : la LED rouge (PG10) clignote */
+  __HAL_RCC_GPIOG_CLK_ENABLE();
+  {
+    GPIO_InitTypeDef g = {0};
+    g.Pin = GPIO_PIN_10; g.Mode = GPIO_MODE_OUTPUT_PP; g.Pull = GPIO_NOPULL; g.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOG, &g);
+    while (1) { HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_10); attente(1000000); }
+  }
 
   /* USER CODE END 2 */
 
@@ -189,6 +267,8 @@ void SystemClock_Config(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+  led_init();
+  while (1) { HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_10); attente(5000000); }   /* rouge lent */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)

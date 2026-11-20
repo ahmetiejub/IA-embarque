@@ -115,6 +115,12 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  /* Projet AMR & EJUB : remise a zero de la zone memoire du DMA Ethernet (NOLOAD dans le .ld).
+     Indispensable au demarrage autonome depuis la flash, sans effet en mode Dev_Boot. */
+  {
+    extern uint8_t _seth_dma[], _eeth_dma[];
+    for (uint8_t *p = _seth_dma; p < _eeth_dma; p++) { *p = 0U; }
+  }
 
   /* USER CODE END 1 */
 

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Station météo IA – AMR &amp; EJUB</title>
+<meta name="description" content="Station météo à IA embarquée sur STM32N6 : résultats en direct (Edge, Cloud, vraie météo).">
+<style>
+:root{--bg:#eef2f7;--card:#fff;--txt:#132033;--mut:#66758c;--line:#e2e8f0;--ok:#16a34a;--ko:#dc2626;--wait:#94a3b8;
+--Soleil:#f59e0b;--Nuageux:#64748b;--Pluie:#2563eb;--Neige:#0891b2}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1018;--card:#141b26;--txt:#e7edf5;--mut:#8d9bb0;--line:#253043;--Nuageux:#94a3b8}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:inherit}
+.wrap{max-width:1120px;margin:auto;padding:0 16px}
+header{padding:26px 0 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+h1{font-size:23px;margin:0;letter-spacing:-.01em}h1 small{display:block;font-size:13.5px;font-weight:500;color:var(--mut);margin-top:3px}
+.pill{font-size:13px;padding:5px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.pill b{color:var(--wait)}.pill.on b{color:var(--ok)}.pill.off b{color:var(--ko)}
+.intro{color:var(--mut);margin:0 0 14px;max-width:780px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(12,1fr);padding-bottom:20px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;grid-column:span 12;min-width:0}
+@media(min-width:800px){.s4{grid-column:span 4}.s5{grid-column:span 5}.s6{grid-column:span 6}.s7{grid-column:span 7}.s8{grid-column:span 8}}
+h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:0 0 12px;font-weight:650}
+.mut{color:var(--mut);font-size:13px}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:620px){.trio{grid-template-columns:1fr}}
+.src{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;position:relative;overflow:hidden}
+.src::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--k,var(--line))}
+.src svg{width:56px;height:56px;flex:none}
+.who{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.cl{font-size:25px;font-weight:750;line-height:1.15;color:var(--k,var(--txt))}
+.det{font-size:12.5px;color:var(--mut)}
+.verdict{margin-top:14px;padding:12px 14px;border-radius:12px;font-weight:650;display:flex;gap:10px;align-items:center;background:color-mix(in srgb,var(--wait) 14%,transparent)}
+.verdict.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.verdict.ko{background:color-mix(in srgb,var(--ko) 12%,transparent);color:var(--ko)}
+.verdict span{font-size:20px}
+.score{display:flex;gap:18px;align-items:center}.ring{width:118px;height:118px;flex:none}.big{font-size:34px;font-weight:750}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:12px;text-align:left;color:var(--mut);font-weight:600;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line)}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-weight:650;font-size:12.5px;color:#fff;background:var(--k,#888)}
+.ok{color:var(--ok)}.ko{color:var(--ko)}
+.charts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:700px){.charts{grid-template-columns:1fr}}
+.charts>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.charts .v{font-size:22px;font-weight:700}.charts .v small{font-size:13px;color:var(--mut);font-weight:500;margin-left:2px}
+svg.ch{width:100%;height:90px;display:block;margin-top:6px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0;padding:0;list-style:none}
+@media(max-width:800px){.steps{grid-template-columns:1fr 1fr}}
+.steps li{border:1px solid var(--line);border-radius:12px;padding:12px}.steps b{display:block;margin-bottom:4px}
+.err{display:none;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--ko) 12%,transparent);color:var(--ko);font-size:14px}
+footer{color:var(--mut);font-size:12.5px;padding:4px 0 28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Station météo IA embarquée<small>Le Bourget-du-Lac · Projet AMR &amp; EJUB · ETRS923, Université Savoie Mont Blanc</small></h1>
+  <div class="pill" id="etat"><b>●</b> chargement…</div>
+</header>
+<p class="intro">Une carte STM32N6 mesure la température, l'humidité et la pression, et un réseau de neurones exécuté <b>sur la carte</b> devine le temps qu'il fait. Le même modèle tourne aussi <b>dans le Cloud</b> (MATLAB). Cette page compare en direct les deux réponses avec <b>la vraie météo</b>.</p>
+<div class="err" id="err"></div>
+<div class="grid">
+
+  <section class="c s8">
+    <h2>Qui dit quoi ?</h2>
+    <div class="trio">
+      <div class="src" id="src_e"><div id="ico_e"></div><div><div class="who">Carte (IA Edge)</div><div class="cl" id="cl_e">–</div><div class="det" id="det_e">en attente</div></div></div>
+      <div class="src" id="src_c"><div id="ico_c"></div><div><div class="who">Cloud (MATLAB)</div><div class="cl" id="cl_c">–</div><div class="det" id="det_c">via ThingSpeak</div></div></div>
+      <div class="src" id="src_r"><div id="ico_r"></div><div><div class="who">Vraie météo</div><div class="cl" id="cl_r">–</div><div class="det" id="det_r">Open-Meteo</div></div></div>
+    </div>
+    <div class="verdict" id="verdict"><span>…</span><div>En attente des données de la station</div></div>
+  </section>
+
+  <section class="c s4">
+    <h2>Score de la carte</h2>
+    <div class="score">
+      <svg class="ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--line)" stroke-width="12"/>
+        <circle id="arc" cx="60" cy="60" r="50" fill="none" stroke="var(--ok)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 315" transform="rotate(-90 60 60)"/></svg>
+      <div><div class="big" id="pct">–</div><div class="mut">bonnes réponses face à la vraie météo, depuis le démarrage de la carte</div></div>
+    </div>
+  </section>
+
+  <section class="c s7">
+    <h2>Mesures de la carte et météo dehors</h2>
+    <table>
+      <tr><th></th><th class="n">Carte</th><th class="n">Dehors</th><th class="n">Écart</th></tr>
+      <tr><td>Température</td><td class="n" id="t_c">–</td><td class="n" id="t_r">–</td><td class="n" id="t_d">–</td></tr>
+      <tr><td>Humidité</td><td class="n" id="h_c">–</td><td class="n" id="h_r">–</td><td class="n" id="h_d">–</td></tr>
+      <tr><td>Pression (niveau mer)</td><td class="n" id="p_c">–</td><td class="n" id="p_r">–</td><td class="n" id="p_d">–</td></tr>
+    </table>
+    <div class="mut" id="note" style="margin-top:10px"></div>
+  </section>
+
+  <section class="c s5">
+    <h2>Dernières comparaisons</h2>
+    <table><thead><tr><th>Heure</th><th>Carte</th><th>Vraie météo</th><th class="n"></th></tr></thead><tbody id="log"></tbody></table>
+    <div class="mut" id="log_vide" style="padding-top:8px">Aucune comparaison reçue pour l'instant.</div>
+  </section>
+
+  <section class="c">
+    <h2>Mesures envoyées par la carte</h2>
+    <div class="charts">
+      <div><div class="mut">Température</div><div class="v" id="m_t">–<small>°C</small></div><svg class="ch" id="ch_t"></svg></div>
+      <div><div class="mut">Humidité</div><div class="v" id="m_h">–<small>%</small></div><svg class="ch" id="ch_h"></svg></div>
+      <div><div class="mut">Pression mesurée</div><div class="v" id="m_p">–<small>hPa</small></div><svg class="ch" id="ch_p"></svg></div>
+    </div>
+    <div class="mut" id="periode" style="margin-top:8px"></div>
+  </section>
+
+  <section class="c">
+    <h2>Comment ça marche</h2>
+    <ol class="steps">
+      <li><b>1. Mesure</b><span class="mut">Capteurs SHT40 et LPS22HH sur une carte NUCLEO-N657X0-Q (Cortex-M55).</span></li>
+      <li><b>2. IA sur la carte</b><span class="mut">Réseau de neurones 12 → 32 → 16 → 5 exécuté en C en ≈ 5,6 ms, sans Internet.</span></li>
+      <li><b>3. IA dans le Cloud</b><span class="mut">Les mesures partent sur ThingSpeak ; MATLAB les classe avec le même modèle ONNX.</span></li>
+      <li><b>4. Vérification</b><span class="mut">La carte compare sa réponse à la météo réelle d'Open-Meteo et tient un score.</span></li>
+    </ol>
+  </section>
+</div>
+<footer>Données : <a href="https://thingspeak.mathworks.com/channels/3546450" target="_blank" rel="noopener">ThingSpeak</a> (mise à jour toutes les 20 s par la carte) et <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · Code source : <a href="https://github.com/ahmetiejub/IA-embarque" target="_blank" rel="noopener">github.com/ahmetiejub/IA-embarque</a></footer>
+</div>
+<script>
+/* ---------- Réglages ---------- */
+var CANAL_MESURES = 3546450;      /* canal où la carte publie (doit être public)          */
+var CANAL_RESULTATS = 3546457;    /* canal où MATLAB publie sa classe (doit être public)  */
+var CLE_LECTURE = "";             /* Read API Key si le canal est privé (sinon laisser "") */
+var LAT = 45.65, LON = 5.86, ALT = 240;   /* Le Bourget-du-Lac */
+var CLASSES = ["Neige", "Nuageux", "Pluie", "Soleil"];   /* codage des champs 4 et 6 */
+
+var ICO={
+Soleil:'<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="12" fill="#f59e0b"/><g stroke="#f59e0b" stroke-width="4" stroke-linecap="round"><path d="M32 7v7M32 50v7M7 32h7M50 32h7M14.3 14.3l5 5M44.7 44.7l5 5M14.3 49.7l5-5M44.7 19.3l5-5"/></g></svg>',
+Nuageux:'<svg viewBox="0 0 64 64"><path d="M19 47h27a11 11 0 0 0 0-22 15 15 0 0 0-28 4 9 9 0 0 0 1 18z" fill="#94a3b8"/></svg>',
+Pluie:'<svg viewBox="0 0 64 64"><path d="M19 37h27a11 11 0 0 0 0-22 15 15 0 0 0-28 4 9 9 0 0 0 1 18z" fill="#64748b"/><g stroke="#2563eb" stroke-width="4" stroke-linecap="round"><path d="M22 45l-3 9M33 45l-3 9M44 45l-3 9"/></g></svg>',
+Neige:'<svg viewBox="0 0 64 64"><path d="M19 37h27a11 11 0 0 0 0-22 15 15 0 0 0-28 4 9 9 0 0 0 1 18z" fill="#94a3b8"/><g fill="#0891b2"><circle cx="21" cy="49" r="3.5"/><circle cx="32" cy="54" r="3.5"/><circle cx="43" cy="49" r="3.5"/></g></svg>'};
+function $(i){return document.getElementById(i)}
+function col(c){var v=getComputedStyle(document.documentElement).getPropertyValue('--'+c).trim();return v||'#888'}
+function f(v,d){return (v===null||v===undefined||v===''||isNaN(v))?'–':Number(v).toFixed(d)}
+function sg(v,d){return (v>0?'+':'')+f(v,d)}
+function num(v){return (v===null||v===undefined||v==='')?null:Number(v)}
+function nom(v){var n=num(v);return (n===null||isNaN(n)||n<0||n>3)?null:CLASSES[Math.round(n)]}
+function tag(c){return c?'<span class="tag" style="--k:'+col(c)+'">'+c+'</span>':'–'}
+function src(id,c){var el=$('src_'+id);el.style.setProperty('--k',c?col(c):'var(--line)');$('cl_'+id).textContent=c||'–';$('ico_'+id).innerHTML=c?ICO[c]:''}
+function heure(d){return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+function niveauMer(p,t){return p*Math.pow(1-0.0065*ALT/(t+0.0065*ALT+273.15),-5.257)}
+function wmo(c){if(c<=1)return'Soleil';if(c<=3||c==45||c==48)return'Nuageux';if((c>=71&&c<=77)||c==85||c==86)return'Neige';return'Pluie'}
+function url(canal,n){return 'https://api.thingspeak.com/channels/'+canal+'/feeds.json?results='+n+(CLE_LECTURE?'&api_key='+CLE_LECTURE:'')}
+function graph(id,pts,c){var s=$(id),w=s.clientWidth||300,h=90;if(pts.length<2){s.innerHTML='';return}
+ var ys=pts.map(function(p){return p[1]}),mn=Math.min.apply(0,ys),mx=Math.max.apply(0,ys);if(mx-mn<0.4){mn-=0.2;mx+=0.2}
+ var t0=pts[0][0],t1=pts[pts.length-1][0]||t0+1;
+ var P=pts.map(function(p){return ((p[0]-t0)/(t1-t0)*(w-6)+3).toFixed(1)+','+(h-16-(p[1]-mn)/(mx-mn)*(h-26)).toFixed(1)}).join(' ');
+ s.setAttribute('viewBox','0 0 '+w+' '+h);
+ s.innerHTML='<polyline fill="none" stroke="'+c+'" stroke-width="2.3" stroke-linejoin="round" points="'+P+'"/>'+
+  '<text x="3" y="'+(h-2)+'" font-size="10.5" fill="var(--mut)">'+heure(new Date(t0))+'</text>'+
+  '<text x="'+(w-3)+'" y="'+(h-2)+'" font-size="10.5" fill="var(--mut)" text-anchor="end">'+heure(new Date(t1))+'</text>'}
+
+var reel=null;
+function majReel(){fetch('https://api.open-meteo.com/v1/forecast?latitude='+LAT+'&longitude='+LON+'&current=weather_code,temperature_2m,relative_humidity_2m,pressure_msl')
+ .then(function(r){return r.json()}).then(function(d){var c=d.current;reel={classe:wmo(c.weather_code),code:c.weather_code,t:c.temperature_2m,rh:c.relative_humidity_2m,p:c.pressure_msl};majTout()}).catch(function(){})}
+
+var mesures=null,cloud=null;
+function majStation(){
+ Promise.all([fetch(url(CANAL_MESURES,120)).then(function(r){return r.json()}),
+              fetch(url(CANAL_RESULTATS,1)).then(function(r){return r.json()}).catch(function(){return null})])
+ .then(function(r){
+   if(!r[0]||!r[0].feeds){throw 0}
+   mesures=r[0].feeds;cloud=r[1]&&r[1].feeds&&r[1].feeds.length?r[1].feeds[r[1].feeds.length-1]:null;
+   $('err').style.display='none';majTout()})
+ .catch(function(){var e=$('err');e.style.display='block';
+   e.textContent='Impossible de lire le canal ThingSpeak '+CANAL_MESURES+'. Il doit être public (ThingSpeak → Channel → Sharing → « Share channel view with everyone »).'})}
+
+function majTout(){
+ if(!mesures||!mesures.length){return}
+ var der=mesures[mesures.length-1],age=(Date.now()-new Date(der.created_at))/1000;
+ var et=$('etat');
+ if(age<120){et.className='pill on';et.innerHTML='<b>●</b> station en ligne · dernière mesure il y a '+Math.round(age)+' s'}
+ else{et.className='pill off';et.innerHTML='<b>●</b> station hors ligne · dernière mesure à '+heure(new Date(der.created_at))+' le '+new Date(der.created_at).toLocaleDateString('fr-FR')}
+ /* dernière ligne qui contient une réponse Edge */
+ var e=null;for(var i=mesures.length-1;i>=0;i--){if(nom(mesures[i].field4)){e=mesures[i];break}}
+ var ce=e?nom(e.field4):null;
+ src('e',ce);$('det_e').textContent=e?'confiance '+f(e.field5,0)+' % · à '+heure(new Date(e.created_at)):'en attente';
+ var cc=null;if(cloud){var k=num(cloud.field1);if(k>=1&&k<=4)cc=CLASSES[k-1];}
+ src('c',cc);$('det_c').textContent=cc?('confiance '+f(cloud.field2,0)+' % · à '+heure(new Date(cloud.created_at))):'script MATLAB arrêté';
+ var cr=reel?reel.classe:null;src('r',cr);$('det_r').textContent=reel?'Open-Meteo · code WMO '+reel.code:'Open-Meteo';
+ var v=$('verdict');
+ if(ce&&cr){var ok=ce===cr;v.className='verdict '+(ok?'ok':'ko');
+  v.innerHTML='<span>'+(ok?'✓':'✗')+'</span><div>'+(ok?'La carte est d\'accord avec la vraie météo':'La carte dit '+ce+', dehors c\'est '+cr)+(cc?(cc===ce?' · le Cloud dit pareil':' · le Cloud dit '+cc):'')+'</div>'}
+ /* score */
+ var sc=null;for(i=mesures.length-1;i>=0;i--){if(num(mesures[i].field7)!==null){sc=num(mesures[i].field7);break}}
+ $('pct').textContent=sc===null?'–':Math.round(sc)+' %';
+ $('arc').setAttribute('stroke-dasharray',(3.142*(sc||0)).toFixed(1)+' 315');$('arc').setAttribute('stroke',(sc||0)>=50?col('ok'):col('ko'));
+ /* carte vs dehors */
+ var T=num(der.field1),H=num(der.field2),P=num(der.field3),Pm=(T!==null&&P!==null)?niveauMer(P,T):null;
+ $('t_c').textContent=f(T,1)+' °C';$('h_c').textContent=f(H,0)+' %';$('p_c').textContent=f(Pm,1)+' hPa';
+ if(reel){$('t_r').textContent=f(reel.t,1)+' °C';$('h_r').textContent=f(reel.rh,0)+' %';$('p_r').textContent=f(reel.p,1)+' hPa';
+  $('t_d').textContent=sg(T-reel.t,1);$('h_d').textContent=sg(H-reel.rh,0);$('p_d').textContent=sg(Pm-reel.p,1);
+  $('note').textContent=Math.abs(T-reel.t)>5?'La carte mesure un air bien différent de l\'extérieur (elle est sans doute à l\'intérieur) : sa réponse ne peut pas refléter la météo dehors.':''}
+ /* journal : les comparaisons (champs 4 et 6), une par minute */
+ var lignes=[],vu={};
+ for(i=mesures.length-1;i>=0&&lignes.length<10;i--){var m=mesures[i],a=nom(m.field4),b=nom(m.field6);if(!a||!b)continue;
+  var h=heure(new Date(m.created_at));if(vu[h])continue;vu[h]=1;
+  lignes.push('<tr><td>'+h+'</td><td>'+tag(a)+'</td><td>'+tag(b)+'</td><td class="n '+(a===b?'ok':'ko')+'">'+(a===b?'✓':'✗')+'</td></tr>')}
+ $('log').innerHTML=lignes.join('');$('log_vide').style.display=lignes.length?'none':'block';
+ /* courbes */
+ function serie(k){return mesures.filter(function(m){return num(m[k])!==null}).map(function(m){return [new Date(m.created_at).getTime(),num(m[k])]})}
+ $('m_t').firstChild.nodeValue=f(T,1);$('m_h').firstChild.nodeValue=f(H,0);$('m_p').firstChild.nodeValue=f(P,1);
+ graph('ch_t',serie('field1'),'#ef4444');graph('ch_h',serie('field2'),'#0891b2');graph('ch_p',serie('field3'),'#8b5cf6');
+ $('periode').textContent=mesures.length+' dernières mesures, de '+heure(new Date(mesures[0].created_at))+' à '+heure(new Date(der.created_at))+'.';
+}
+majReel();majStation();setInterval(majStation,20000);setInterval(majReel,300000);setInterval(majTout,1000);
+</script>
+</body>
+</html>

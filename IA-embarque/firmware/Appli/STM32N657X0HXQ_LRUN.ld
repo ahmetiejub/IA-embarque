@@ -168,9 +168,11 @@ SECTIONS
   } >RAM
 
   /* Memoires du DMA Ethernet (adresse fixe) */
-  .eth_dma :
+  /* NOLOAD : zone remise a zero par main() (pas copiee depuis la flash au demarrage autonome) */
+  .eth_dma (NOLOAD) :
   {
     . = ALIGN(32);
+    _seth_dma = .;
     *(.RxDecripSection)
     . = ALIGN(32);
     *(.TxDecripSection)
@@ -178,6 +180,7 @@ SECTIONS
     *(.EthDma)
     *(.EthDma*)
     . = ALIGN(32);
+    _eeth_dma = .;
   } >ETHRAM
 
   /* Uninitialized data section into "RAM" Ram type memory */
